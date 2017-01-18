@@ -27,8 +27,8 @@ extension Card {
 
 extension MutableCollection where Self.Iterator.Element == Card {
     
-    func mergeSort() -> [Card] {
-        if count <= 1 {
+    func mergeSortWithListener(listener: Listener?, threadSleep: useconds_t) -> [Card] {
+        if count <= 1 || listener == nil { // O(1)
             return self as! [Card]
         }
         let length = distance(from: startIndex, to:endIndex) as! Int // O(n)
@@ -39,8 +39,8 @@ extension MutableCollection where Self.Iterator.Element == Card {
         var evaluatingLeftIndex = 0 // O(1)
         var evaluatingRightIndex = 0 // O(1)
         var mergedArray = [Card]() // O(1)
-        leftItems = leftItems.mergeSort() // O(nlog(n))
-        rightItems = rightItems.mergeSort() // O(nlog(n))
+        leftItems = leftItems.mergeSortWithListener(listener: listener, threadSleep: threadSleep) // O(nlog(n))
+        rightItems = rightItems.mergeSortWithListener(listener: listener, threadSleep: threadSleep) // O(nlog(n))
         
         var mergeIndex = 0
         while mergeIndex < length { // O(n)
@@ -65,6 +65,11 @@ extension MutableCollection where Self.Iterator.Element == Card {
             }
             mergeIndex += 1 // O(1)
         }
+        DispatchQueue.main.async {
+            listener?(mergedArray)
+        }
+        
+        usleep(threadSleep)
         
         return mergedArray
     }

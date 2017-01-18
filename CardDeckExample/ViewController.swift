@@ -23,6 +23,8 @@ extension MutableCollection where Indices.Iterator.Element == Index {
     }
 }
 
+typealias Listener = ([Card]) -> Void
+
 public enum CardSuit {
     case Clubs, Diamonds, Hearts, Spades
     
@@ -134,15 +136,17 @@ class ViewController: UIViewController {
     @IBOutlet weak var blueDeckCollectionView: UICollectionView!
     @IBOutlet weak var scrambledDeckCollectionView: UICollectionView!
     
-    
-    
     var redDeck = Deck()
     var blueDeck = Deck()
     var scrambledDeck = [Card]()
     let standard52DeckRanks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+    fileprivate var listener: Listener!
+    var mergeProcessCounter = [Int:Int]()
+    var threadSleep: UInt32 = 1
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        initListener()
         // Do any additional setup after loading the view, typically from a nib.
         let suits: [CardSuit] = [.Clubs, .Diamonds, .Hearts, .Spades]
         let decks: [CardDeck] = [.Red, .Blue]
@@ -161,17 +165,64 @@ class ViewController: UIViewController {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
+    
+    func initListener() {
+        listener = { [weak self] sortedSubArray in
+            guard let levelCounter = self?.mergeProcessCounter[sortedSubArray.count] as Int? else {
+                self?.mergeProcessCounter[sortedSubArray.count] = 1
+                self?.scrambledDeck.replaceSubrange(0..<sortedSubArray.count, with: sortedSubArray)
+                self?.scrambledDeckCollectionView.reloadData()
+                return
+            }
+            let startIndex = levelCounter*sortedSubArray.count
+            if (startIndex + sortedSubArray.count) <= self?.scrambledDeck.count ?? 0 {
+                self?.scrambledDeck.replaceSubrange(startIndex..<(startIndex + sortedSubArray.count), with: sortedSubArray)
+                self?.mergeProcessCounter[sortedSubArray.count] = levelCounter + 1
+                self?.scrambledDeckCollectionView.reloadData()
+            }
+        }
+    }
 
     @IBAction func reorderDecks(_ sender: Any) {
-        scrambledDeck = scrambledDeck.mergeSort()
-        scrambledDeckCollectionView.reloadData()
+        reorderDecks()
     }
     
     @IBAction func scrambleDecks(_ sender: Any) {
+        listener = nil
+        initListener()
+        mergeProcessCounter.removeAll()
         scrambledDeck.shuffle()
         scrambledDeckCollectionView.reloadData()
+        scrambledDeckCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
     }
     
+    func reorderDecks() {
+        mergeProcessCounter.removeAll()
+        DispatchQueue.global(qos: .background).async {
+            let deck = self.scrambledDeck
+            self.scrambledDeck = deck.mergeSortWithListener(listener: self.listener, threadSleep: self.threadSleep)
+        }
+    }
+    
+    func threadSleepStringForRow(row: Int) -> String {
+        switch row {
+        case 0:
+            return "0"
+        case 1:
+            return "0.5"
+        case 2:
+            return "1"
+        case 3:
+            return "1.5"
+        default:
+            return "0"
+        }
+    }
+    
+    func threadSleepIntForRow(row: Int) -> useconds_t {
+        let second: Double = 1000000
+        return UInt32(Double(threadSleepStringForRow(row: row))! * second)
+    }
 }
 
 extension ViewController: UICollectionViewDataSource {
@@ -214,6 +265,7 @@ extension ViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
         cell.cardLabel.text = card.stringRepresentation()
+        // TODO: Set a border to the cell group dynamically being sorted!
         
         return cell
     }
@@ -221,4 +273,32 @@ extension ViewController: UICollectionViewDataSource {
 
 extension ViewController: UICollectionViewDelegate {
     
+}
+
+extension ViewController: UIPickerViewDataSource {
+    func numberOfComponents(in pickerView: UIPickerView) -> Int {
+        return 2
+    }
+    
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        return component == 0 ? 1 : 4
+    }
+    
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        if component == 0 {
+            return "Thread Sleep:"
+        }
+        else {
+            return threadSleepStringForRow(row: row)
+        }
+    }
+}
+
+extension ViewController: UIPickerViewDelegate {
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        listener = nil
+        initListener()
+        threadSleep = threadSleepIntForRow(row: row)
+        reorderDecks()
+    }
 }
