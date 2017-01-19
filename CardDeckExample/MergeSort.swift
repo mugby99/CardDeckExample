@@ -8,20 +8,37 @@
 
 import Foundation
 
-extension Card {
-    
-    func isHigherThanCard(card: Card) -> Bool {
-        if deck == card.deck {
-            if (card.suit.rank() == suit.rank()) {
-                return Card.intFromRank(rank:rank) > Card.intFromRank(rank: card.rank)
+extension Card : Comparable {
+    public static func > (lhs: Card, rhs: Card) -> Bool {
+        if lhs.deck == rhs.deck {
+            if (lhs.suit.rank() == rhs.suit.rank()) {
+                return Card.intFromRank(rank:lhs.rank) > Card.intFromRank(rank: rhs.rank)
             }
             else {
-                return card.suit.rank() > suit.rank()
+                return rhs.suit.rank() > lhs.suit.rank()
             }
         }
         else {
-            return deck == .Red
+            return lhs.deck == .Red
         }
+    }
+    
+    public static func < (lhs: Card, rhs: Card) -> Bool {
+        if lhs.deck == rhs.deck {
+            if (lhs.suit.rank() == rhs.suit.rank()) {
+                return Card.intFromRank(rank:lhs.rank) < Card.intFromRank(rank: rhs.rank)
+            }
+            else {
+                return rhs.suit.rank() < lhs.suit.rank()
+            }
+        }
+        else {
+            return lhs.deck == .Blue
+        }
+    }
+    
+    public static func == (lhs: Card, rhs: Card) -> Bool {
+        return lhs.deck == rhs.deck && lhs.rank == rhs.rank && lhs.suit == rhs.suit
     }
 }
 
@@ -44,23 +61,22 @@ extension MutableCollection where Self.Iterator.Element == Card {
         
         var mergeIndex = 0
         while mergeIndex < length { // O(n)
-            //            mergedArray.insert(leftItems[evaluatingLeftIndex], at: evaluatingLeftIndex)
             if evaluatingLeftIndex == leftItems.count { // O(1)
                 // Add remaining right array items to mergedArray
-                mergedArray.insert(rightItems[evaluatingRightIndex], at: mergeIndex) // O(n) !!!
+                mergedArray.append(rightItems[evaluatingRightIndex]) // O(1)
                 evaluatingRightIndex += 1 // O(1)
             }
             else if evaluatingRightIndex == rightItems.count { // O(1)
                 // Add remaining left array items to mergedArray
-                mergedArray.insert(leftItems[evaluatingLeftIndex], at: mergeIndex) // O(n) !!!
+                mergedArray.append(leftItems[evaluatingLeftIndex]) // O(1)
                 evaluatingLeftIndex += 1 // O(1)
             }
-            else if leftItems[evaluatingLeftIndex].isHigherThanCard(card: rightItems[evaluatingRightIndex]) { // O(1)
-                mergedArray.insert(rightItems[evaluatingRightIndex], at: mergeIndex) // O(n) !!!
+            else if leftItems[evaluatingLeftIndex] > rightItems[evaluatingRightIndex] { // O(1)
+                mergedArray.append(rightItems[evaluatingRightIndex]) // O(1)
                 evaluatingRightIndex += 1 // O(1)
             }
             else { // O(1)
-                mergedArray.insert(leftItems[evaluatingLeftIndex], at: mergeIndex) // O(n) !!!
+                mergedArray.append(leftItems[evaluatingLeftIndex]) // O(1)
                 evaluatingLeftIndex += 1 // O(1)
             }
             mergeIndex += 1 // O(1)

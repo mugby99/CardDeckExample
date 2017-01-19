@@ -143,6 +143,7 @@ class ViewController: UIViewController {
     fileprivate var listener: Listener!
     var mergeProcessCounter = [Int:Int]()
     var threadSleep: UInt32 = 1
+    var currentSubArray:[Card]?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -168,16 +169,19 @@ class ViewController: UIViewController {
     
     func initListener() {
         listener = { [weak self] sortedSubArray in
+            self?.currentSubArray = sortedSubArray
             guard let levelCounter = self?.mergeProcessCounter[sortedSubArray.count] as Int? else {
                 self?.mergeProcessCounter[sortedSubArray.count] = 1
+                self?.scrambledDeckCollectionView.reloadData()
                 self?.scrambledDeck.replaceSubrange(0..<sortedSubArray.count, with: sortedSubArray)
                 self?.scrambledDeckCollectionView.reloadData()
                 return
             }
             let startIndex = levelCounter*sortedSubArray.count
             if (startIndex + sortedSubArray.count) <= self?.scrambledDeck.count ?? 0 {
-                self?.scrambledDeck.replaceSubrange(startIndex..<(startIndex + sortedSubArray.count), with: sortedSubArray)
                 self?.mergeProcessCounter[sortedSubArray.count] = levelCounter + 1
+                self?.scrambledDeckCollectionView.reloadData()
+                self?.scrambledDeck.replaceSubrange(startIndex..<(startIndex + sortedSubArray.count), with: sortedSubArray)
                 self?.scrambledDeckCollectionView.reloadData()
             }
         }
@@ -198,6 +202,8 @@ class ViewController: UIViewController {
     
     func reorderDecks() {
         mergeProcessCounter.removeAll()
+        listener = nil
+        initListener()
         DispatchQueue.global(qos: .background).async {
             let deck = self.scrambledDeck
             self.scrambledDeck = deck.mergeSortWithListener(listener: self.listener, threadSleep: self.threadSleep)
@@ -265,7 +271,12 @@ extension ViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
         cell.cardLabel.text = card.stringRepresentation()
-        // TODO: Set a border to the cell group dynamically being sorted!
+        cell.alpha = 1
+        if mergeProcessCounter.count > 0 && currentSubArray != nil {
+            if currentSubArray!.contains(scrambledDeck[indexPath.row]) {
+                cell.alpha = 0.5
+            }
+        }
         
         return cell
     }
@@ -296,9 +307,6 @@ extension ViewController: UIPickerViewDataSource {
 
 extension ViewController: UIPickerViewDelegate {
     func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
-        listener = nil
-        initListener()
         threadSleep = threadSleepIntForRow(row: row)
-        reorderDecks()
     }
 }
